@@ -35,6 +35,17 @@ const EventsList: React.FC = () => {
       })
   }, []);
 
+  const groupEventsByDay = (events: Event[]) => {
+    return events.reduce((groups, event) => {
+      const date = event.day;
+      if (!groups[date]) {
+        groups[date] = [];
+      }
+      groups[date].push(event);
+      return groups;
+    }, {} as { [key: string]: Event[]});
+  }
+
   if (isLoading) {
     return (
       <View style={styles.loadingView}>
@@ -46,6 +57,8 @@ const EventsList: React.FC = () => {
     )
   }
 
+  const groupedEvents = groupEventsByDay(events);
+
   return (
     <View>
       <View style={styles.header}>
@@ -54,9 +67,16 @@ const EventsList: React.FC = () => {
         </Text>
       </View>
       <FlatList
-        data={events}
-        keyExtractor={item => item.id.toString()}
-        renderItem={({ item }) => <EventCard event={item} />}
+        data={Object.keys(groupedEvents)}
+        keyExtractor={item => item}
+        renderItem={({ item: day }) => (
+          <View>
+            <Text style={styles.date}>{day}</Text>
+            {groupedEvents[day].map(event => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </View>
+        )}
       />
     </View>
   );
@@ -69,7 +89,6 @@ interface EventCardProps {
 const EventCard: React.FC<EventCardProps> = ({ event }) => {
   return (
     <View style={styles.card}>
-      <Text style={styles.date}>{event.day}</Text>
       <Text style={styles.discipline}>{event.discipline_name}</Text>
       <FlatList
         data={event.competitors}
@@ -108,6 +127,7 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 18,
     fontWeight: 'bold',
+    padding: 15
   },
   discipline: {
     fontSize: 16,
