@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Image, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Button } from 'react-native';
 import { api } from '../lib/axios';
 
 interface Competitor {
@@ -16,24 +16,40 @@ interface Event {
   competitors: Competitor[];
 }
 
+interface Pagination {
+  data: Event[];
+  meta: {
+    current_page: number;
+    last_page: number;
+  };
+}
+
 const EventsList: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [lastPage, setLastPage] = useState<number>(1);
 
   useEffect(() => {
-    api.get('/events')
-      .then(response => {
-        setEvents(response.data.data);
-      })
-      .catch(error => {
-        setError(error.message);
-        console.error('Error fetching events:', error);
-      })
-      .finally(() => {
+    const fetchEvents = async (page: number) => {
+      setIsLoading(true);
+      try {
+        const response = await api.get<Pagination>(`/events?page=${page}`)
+        const { data, meta } = response.data
+        setEvents(data)
+        setCurrentPage(meta.current_page)
+        setLastPage(meta.last_page)
+      } catch (error) {
+        console.log("Error fetching events: ", error);
+      } finally {
         setIsLoading(false);
-      })
-  }, []);
+      }
+    }
+
+    fetchEvents(currentPage);
+
+  }, [currentPage]);
 
   const groupEventsByDay = (events: Event[]) => {
     return events.reduce((groups, event) => {
@@ -43,10 +59,10 @@ const EventsList: React.FC = () => {
       }
       groups[date].push(event);
       return groups;
-    }, {} as { [key: string]: Event[]});
+    }, {} as { [key: string]: Event[] });
   }
 
-  if (isLoading) {
+  if (isLoading && events.length === 0) {
     return (
       <View style={styles.loadingView}>
         <Text style={styles.loadingText}>
@@ -66,17 +82,50 @@ const EventsList: React.FC = () => {
           Jogos Olímpicos Paris 2024
         </Text>
       </View>
+
+      <View style={[styles.pagination, styles.topPagination]}>
+        <View style={styles.paginationButton}>
+          <TouchableOpacity
+            onPress={() => setCurrentPage(prevPage => Math.max(prevPage - 1, 1))}
+            disabled={currentPage === 1}
+            activeOpacity={0.7}
+          >
+            <Text>Anterior</Text>
+          </TouchableOpacity>
+        </View>
+        <Text>{`${currentPage} / ${lastPage}`}</Text>
+        <View style={styles.paginationButton}>
+          <TouchableOpacity
+            onPress={() => setCurrentPage(prevPage => Math.min(prevPage + 1, lastPage))}
+            disabled={currentPage === lastPage}
+          >
+            <Text>Próximo</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+
+      <View>
+        <Text>Filtro</Text>
+      </View>
+
+
       <FlatList
         data={Object.keys(groupedEvents)}
         keyExtractor={item => item}
         renderItem={({ item: day }) => (
           <View>
             <Text style={styles.date}>{day}</Text>
-            {groupedEvents[day].map(event => (
-              <EventCard key={event.id} event={event} />
+            {groupedEvents[day].map((event, index) => (
+              <EventCard key={`${event.id}-${index}`} event={event} />
             ))}
           </View>
         )}
+        ListFooterComponent={
+          <View style={styles.pagination}>
+            
+          </View>
+        }
       />
     </View>
   );
@@ -88,11 +137,11 @@ interface EventCardProps {
 
 const EventCard: React.FC<EventCardProps> = ({ event }) => {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card}>
       <Text style={styles.discipline}>{event.discipline_name}</Text>
       <FlatList
         data={event.competitors}
-        keyExtractor={item => item.country_id}
+        keyExtractor={(item, index) => `${item.country_id}-${index}`}
         renderItem={({ item }) => (
           <View style={styles.competitor}>
             <Image source={{ uri: item.country_flag_url }} style={styles.flag} />
@@ -100,7 +149,7 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
           </View>
         )}
       />
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -115,6 +164,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: "center",
     alignItems: "center",
+    marginTop: 10,
   },
   card: {
     borderWidth: 1,
@@ -127,7 +177,7 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 18,
     fontWeight: 'bold',
-    padding: 15
+    padding: 15,
   },
   discipline: {
     fontSize: 16,
@@ -153,6 +203,28 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     fontSize: 18,
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+    marginBottom: 150,
+    margin: 10,
+    
+  },
+  topPagination: {
+    marginBottom: 0,
+  },
+  paginationButton: {
+    marginHorizontal: 40,
+    borderRadius: 15,
+    borderColor: "#000",
+    borderStyle: "solid",
+    borderWidth: 1,
+    padding: 10,
+    backgroundColor: "#f0b13f",
+    paddingHorizontal: 20,
   },
 });
 
