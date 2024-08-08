@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Button } from 'react-native';
+import { View, Text, FlatList, Image, StyleSheet, ActivityIndicator, Button, Modal, TouchableOpacity } from 'react-native';
 import { api } from '../lib/axios';
+import { Calendar, DateData } from 'react-native-calendars';
+import DropDownPicker from 'react-native-dropdown-picker';
 
 interface Competitor {
   country_id: string;
@@ -13,6 +15,7 @@ interface Event {
   id: number;
   day: string;
   discipline_name: string;
+  gender_code: string;
   competitors: Competitor[];
 }
 
@@ -24,12 +27,25 @@ interface Pagination {
   };
 }
 
+interface Discipline {
+  id: number;
+  name: string;
+}
+
 const EventsList: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [lastPage, setLastPage] = useState<number>(1);
+  const [filters, setFilters] = useState<{ discipline_name: string; gender_code: string; day: string | undefined }>({ discipline_name: '', gender_code: '', day: undefined });
+  const [disciplines, setDisciplines] = useState<{ label: string; value: string }[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState<boolean>(true);
+  const [openDisciplineDropdown, setOpenDisciplineDropdown] = useState<boolean>(false);
+  const [openGenderDropdown, setOpenGenderDropdown] = useState<boolean>(false);
+  const [selectedDiscipline, setSelectedDiscipline] = useState<string | null>(null);
+  const [selectedGender, setSelectedGender] = useState<string | null>(null);
+  
 
   useEffect(() => {
     const fetchEvents = async (page: number) => {
@@ -50,6 +66,26 @@ const EventsList: React.FC = () => {
     fetchEvents(currentPage);
 
   }, [currentPage]);
+
+  useEffect(() => {
+    const fetchDisciplines = async () => {
+      try {
+        const response = await api.get<{ data: Discipline[] }>('/disciplines');
+        setDisciplines(response.data.data.map(discipline => ({ label: discipline.name, value: discipline.name })));
+      } catch (error) {
+        console.error('Error fetching disciplines:', error);
+      }
+    };
+
+    fetchDisciplines();
+  }, []);
+
+  useEffect(() => {
+    setFilters(prevFilters => ({
+      ...prevFilters,
+      discipline_name: selectedDiscipline || '',
+    }));
+  }, [selectedDiscipline]);
 
   const groupEventsByDay = (events: Event[]) => {
     return events.reduce((groups, event) => {
@@ -73,7 +109,19 @@ const EventsList: React.FC = () => {
     )
   }
 
-  const groupedEvents = groupEventsByDay(events);
+  const applyFilters = (events: Event[]) => {
+    const filtered = events.filter(event => {
+      const { discipline_name, gender_code, day } = filters;
+      const matchesDiscipline = discipline_name ? event.discipline_name === discipline_name : true;
+      const matchesGender = gender_code ? event.gender_code === gender_code : true;
+      const matchesDay = day ? event.day === day : true;
+      return matchesDiscipline && matchesGender && matchesDay;
+    });
+    return filtered;
+  };
+
+  const filteredEvents = applyFilters(events);
+  const groupedEvents = groupEventsByDay(filteredEvents);
 
   return (
     <View>
@@ -104,10 +152,70 @@ const EventsList: React.FC = () => {
         </View>
       </View>
 
+      <View style={styles.filterContainer}>
+        <TouchableOpacity onPress={() => setIsModalVisible(true)} style={styles.filterButton}>
+          <Text style={styles.filterButtonText}>
+            Filtrar por:
+          </Text>
+        </TouchableOpacity>
 
-      <View>
-        <Text>Filtro</Text>
+        <Modal
+          animationType='slide'
+          transparent={true}
+          visible={isModalVisible}
+          onRequestClose={() => {
+            setIsModalVisible(!isModalVisible)
+          }}
+        >
+          <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Filtrar por:</Text>
+            
+            <DropDownPicker
+              open={openDisciplineDropdown}
+              value={filters.discipline_name}
+              items={disciplines}
+              setOpen={setOpenDisciplineDropdown}
+              setValue={(value) => setFilters({ ...filters, discipline_name: value as unknown as string })}
+              placeholder="Selecionar Modalidade"
+              style={styles.dropdown}
+              dropDownContainerStyle={styles.dropdownContainer}
+            />
+            <DropDownPicker
+              open={openGenderDropdown}
+              value={selectedGender}
+              items={[
+                { label: 'Todos os Gêneros', value: '' },
+                { label: 'Masculino', value: 'M' },
+                { label: 'Feminino', value: 'W' }
+              ]}
+              setOpen={setOpenGenderDropdown}
+              setValue={setSelectedGender}
+              placeholder="Selecionar Gênero"
+              style={styles.dropdown}
+              dropDownContainerStyle={styles.dropdownContainer}
+            />
+
+            <Calendar
+              onDayPress={(day: DateData) => setFilters({ ...filters, day: day.dateString })}
+              markedDates={{
+                [filters.day || '']: { selected: true, marked: true, selectedColor: 'blue' }
+              }}
+            />
+            <Button title="Aplicar Filtros" onPress={() => {
+              setFilters(prevFilters => ({
+                ...prevFilters,
+                discipline_name: selectedDiscipline || '',
+                gender_code: selectedGender || '',
+              }))
+              setIsModalVisible(false)
+            }} />
+          </View>
+        </View>
+        </Modal>
+        
       </View>
+
 
 
       <FlatList
@@ -173,6 +281,49 @@ const styles = StyleSheet.create({
     margin: 10,
     borderRadius: 5,
     backgroundColor: '#f9f9f9',
+  },
+  filterContainer: {
+
+  },
+  filterButton: {
+    backgroundColor: '#008CBA',
+    padding: 10,
+    margin: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  filterButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  dropdown: {
+    marginBottom: 10,
+    borderColor: '#cccccc',
+  },
+  dropdownContainer: {
+    borderColor: '#cccccc',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  picker: {
+    height: 50,
+    width: '100%',
   },
   date: {
     fontSize: 18,

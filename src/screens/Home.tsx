@@ -1,28 +1,24 @@
 import React from 'react';
 import { NavigationProps } from '../types/RootStackParamList';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Logo from '../assets/olympicsLogo.png'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function Home({ navigation }: NavigationProps<"Feed">) {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>
-                Olympic Notify
-            </Text>
-            <Image src={Logo} style={styles.img} />
+          <Text style={styles.title}>
+            FilteringOlympics
+          </Text>
+            
             <View style={styles.box}>
                 <Text style={styles.text}>
                     Com esse aplicativo você:
                 </Text>
                 <Text style={styles.text}>
-                    ✅ recebe notificação dos seus jogos favoritos
-                </Text>
-                <Text style={styles.text}>
                     ✅ acompanha o placar dos jogos ao vivo
                 </Text>
                 <Text style={styles.text}>
-                    ✅ tem acesso as informações dos jogadores das equipes
+                    ✅ filtra os jogos por modalidade, gênero ou data
                 </Text>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate("Feed")} style={styles.button}>
@@ -39,7 +35,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "#007dbf",
+        backgroundColor: "#007bff",
         opacity: 0.7,
         padding: 20,
     },
@@ -47,6 +43,8 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontFamily: 'MedulaOne_400Regular',
         fontWeight: "bold",
+        marginBottom:20,
+        color: "#fff"
     },
     img: {
         width: 150,
@@ -67,7 +65,7 @@ const styles = StyleSheet.create({
     },
     button: {
         width: "90%",
-        backgroundColor: "#007bff",
+        backgroundColor: "green",
         padding: 10,
         borderRadius: 5,
         alignItems: "center",
